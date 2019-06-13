@@ -19,6 +19,7 @@ package com.zaxxer.hikari.pool;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.metrics.IMetricsTracker;
 import com.zaxxer.hikari.pool.HikariPool.PoolInitializationException;
+import com.zaxxer.hikari.util.ClockSource;
 import com.zaxxer.hikari.util.DriverDataSource;
 import com.zaxxer.hikari.util.PropertyElf;
 import com.zaxxer.hikari.util.UtilityElf;
@@ -392,17 +393,29 @@ abstract class PoolBase
          }
 
          if (connection.isReadOnly() != isReadOnly) {
-            connection.setReadOnly(isReadOnly);
+            try {
+               connection.setReadOnly(isReadOnly);
+            } catch (UnsupportedOperationException e) {
+               logger.warn("{} - Unsupported: {}", poolName, e.getMessage());
+            }
          }
 
          if (connection.getAutoCommit() != isAutoCommit) {
-            connection.setAutoCommit(isAutoCommit);
+            try {
+               connection.setAutoCommit(isAutoCommit);
+            } catch (UnsupportedOperationException e) {
+               logger.warn("{} - Unsupported: {}", poolName, e.getMessage());
+            }
          }
 
          checkDriverSupport(connection);
 
          if (transactionIsolation != defaultTransactionIsolation) {
-            connection.setTransactionIsolation(transactionIsolation);
+            try {
+               connection.setTransactionIsolation(transactionIsolation);
+            } catch (UnsupportedOperationException e) {
+               logger.warn("{} - Unsupported: {}", poolName, e.getMessage());
+            }
          }
 
          if (catalog != null) {
@@ -465,19 +478,19 @@ abstract class PoolBase
     * @param connection a Connection to check
     * @throws SQLException rethrown from the driver
     */
-   private void checkDefaultIsolation(final Connection connection) throws SQLException
-   {
+   private void checkDefaultIsolation(final Connection connection) throws SQLException {
       try {
          defaultTransactionIsolation = connection.getTransactionIsolation();
          if (transactionIsolation == -1) {
             transactionIsolation = defaultTransactionIsolation;
          }
-      }
-      catch (SQLException e) {
+      } catch (SQLException e) {
          logger.warn("{} - Default transaction isolation level detection failed ({}).", poolName, e.getMessage());
          if (e.getSQLState() != null && !e.getSQLState().startsWith("08")) {
             throw e;
          }
+      } catch (UnsupportedOperationException e) {
+         logger.warn("{} - Default transaction isolation is not supported ({}).", poolName, e.getMessage());
       }
    }
 
